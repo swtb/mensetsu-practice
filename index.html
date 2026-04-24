@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>面接練習</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <style>
+    :root{--bg:#f1f5f9;--bg2:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--primary:#4f46e5;--pri-lt:#eef2ff;--success:#10b981;--warn:#f59e0b;--danger:#ef4444;--shadow:0 2px 8px rgba(0,0,0,.08);--r:14px;--nav:60px}
+    [data-theme=dark]{--bg:#0f172a;--bg2:#1e293b;--text:#f1f5f9;--text2:#94a3b8;--border:#334155;--pri-lt:#312e81;--shadow:0 2px 8px rgba(0,0,0,.3)}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:calc(var(--nav) + env(safe-area-inset-bottom));transition:background .25s,color .25s}
+
+    /* ===== LOGIN SCREEN ===== */
+    .login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;padding:40px 20px}
+    .login-screen.hidden{display:none}
+    .login-logo{font-size:64px;margin-bottom:16px}
+    .login-title{font-size:26px;font-weight:700;color:#fff;margin-bottom:8px;text-align:center}
+    .login-sub{font-size:15px;color:rgba(255,255,255,.75);margin-bottom:48px;text-align:center;line-height:1.6}
+    .login-btn{display:flex;align-items:center;gap:12px;background:#fff;color:#1e293b;border:none;border-radius:12px;padding:14px 24px;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2);transition:transform .15s}
+    .login-btn:active{transform:scale(.97)}
+    .login-btn img{width:24px;height:24px}
+
+    /* ===== LOADING SCREEN ===== */
+    .loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999}
+    .loading-screen.hidden{display:none}
+    .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-txt{font-size:14px;color:var(--text2)}
+
+    /* NAV */
+    .nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:100}
+    .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--text2);font-size:11px;font-weight:600;transition:color .2s}
+    .nav-btn.active{color:var(--primary)}
+    .nav-icon{font-size:22px;line-height:1}
+    /* PAGES */
+    .page{display:none;padding:20px 16px;max-width:640px;margin:0 auto}
+    .page.active{display:block}
+    /* TYPE */
+    .page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+    .page-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+    .sec-lbl{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 9px}
+    /* CARD */
+    .card{background:var(--bg2);border-radius:var(--r);box-shadow:var(--shadow);border:1px solid var(--border);padding:18px;margin-bottom:14px}
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+    .stat{background:var(--bg2);border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--shadow);padding:14px 10px;text-align:center}
+    .stat-val{font-size:26px;font-weight:700;color:var(--primary)}
+    .stat-lbl{font-size:11px;color:var(--text2);margin-top:3px}
+    /* ALERT */
+    .review-alert{background:var(--pri-lt);border:1.5px solid var(--primary);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+    .review-alert-txt{font-size:14px;font-weight:600;color:var(--primary)}
+    .review-alert-sub{font-size:12px;color:var(--text2);margin-top:2px}
+    .review-badge{background:var(--primary);color:#fff;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:700;white-space:nowrap}
+    /* CHIPS */
+    .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+    .chip{padding:5px 13px;border-radius:20px;font-size:13px;font-weight:500;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;transition:all .2s;white-space:nowrap}
+    .chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+    /* OPT */
+    .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .opt-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+    .opt-card{border:2px solid var(--border);border-radius:var(--r);padding:14px 10px;text-align:center;cursor:pointer;background:var(--bg2);transition:all .2s}
+    .opt-card.on{border-color:var(--primary);background:var(--pri-lt)}
+    .opt-icon{font-size:22px;margin-bottom:6px}
+    .opt-lbl{font-size:13px;font-weight:600}
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 18px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:none;transition:all .18s;font-family:inherit}
+    .btn-primary{background:var(--primary);color:#fff;width:100%}
+    .btn-primary:active{background:#4338ca}
+    .btn-secondary{background:var(--bg2);color:var(--text);border:1.5px solid var(--border)}
+    .btn-danger{background:var(--danger);color:#fff}
+    .btn-sm{padding:8px 14px;font-size:13px}
+    .btn-row{display:flex;gap:10px}
+    .btn-row .btn{flex:1}
+    /* FAB */
+    .fab{position:fixed;bottom:calc(var(--nav) + env(safe-area-inset-bottom) + 14px);right:16px;width:54px;height:54px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:26px;cursor:pointer;z-index:50;box-shadow:0 4px 14px rgba(79,70,229,.45);display:flex;align-items:center;justify-content:center;transition:transform .2s}
+    .fab:active{transform:scale(.93)}
+    .fab.hidden{display:none}
+    /* PRACTICE */
+    .prac-wrap{min-height:calc(100vh - var(--nav) - 60px);display:flex;flex-direction:column;padding-top:16px}
+    .prog-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .prog-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+    .prog-fill{height:100%;background:var(--primary);border-radius:3px;transition:width .35s}
+    .prog-txt{font-size:13px;color:var(--text2);white-space:nowrap;font-variant-numeric:tabular-nums}
+    /* MODE TABS */
+    .mode-tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:14px;gap:3px}
+    .mode-tab{flex:1;padding:7px 6px;border-radius:8px;border:none;background:none;font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .2s;text-align:center}
+    .mode-tab.active{background:var(--bg2);color:var(--primary);box-shadow:var(--shadow)}
+    .mode-tab-icon{font-size:16px;display:block;margin-bottom:2px}
+    /* FLASHCARD */
+    .flashcard{flex:1;background:var(--bg2);border-radius:18px;box-shadow:0 4px 20px rgba(0,0,0,.1);border:1px solid var(--border);padding:24px 20px;display:flex;flex-direction:column}
+    .q-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .q-badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px}
+    .q-no{background:var(--bg);color:var(--text2);font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px}
+    .q-text{font-size:18px;font-weight:600;line-height:1.65;flex:1}
+    .timer-row{display:flex;align-items:center;justify-content:center;gap:8px;margin:18px 0}
+    .timer-val{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--primary);transition:color .3s}
+    .timer-val.warn{color:var(--warn)}.timer-val.red{color:var(--danger)}
+    .divider{height:1px;background:var(--border);margin:16px 0}
+    .ans-label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+    .ans-text{font-size:15px;line-height:1.75;white-space:pre-wrap;word-break:break-all}
+    .note-box{margin-top:12px;padding:12px 14px;background:var(--bg);border-radius:10px;font-size:14px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+    /* BLANK */
+    .blank-word{display:inline-block;background:var(--primary);color:var(--primary);border-radius:4px;cursor:pointer;padding:0 2px;min-width:2em;transition:background .25s,color .25s;user-select:none;border-bottom:2px solid rgba(79,70,229,.3)}
+    .blank-word.revealed{background:var(--pri-lt);color:var(--primary)}
+    .blank-hint{font-size:12px;color:var(--text2);text-align:center;margin:10px 0 0;font-style:italic}
+    /* CHUNK */
+    .chunk-progress{display:flex;gap:5px;justify-content:center;margin:10px 0}
+    .chunk-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .2s}
+    .chunk-dot.done{background:var(--success)}.chunk-dot.current{background:var(--primary)}
+    .chunk-text{font-size:16px;line-height:1.8;padding:14px;background:var(--bg);border-radius:10px;margin:12px 0;white-space:pre-wrap}
+    .chunk-hidden{filter:blur(8px);cursor:pointer;user-select:none;transition:filter .2s}
+    .chunk-hidden.shown{filter:none;cursor:default}
+    /* RATING */
+    .rating-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+    .r-btn{padding:14px 8px;border-radius:12px;border:2px solid var(--border);background:var(--bg2);cursor:pointer;text-align:center;transition:all .18s}
+    .r-btn:active{transform:scale(.95)}
+    .r-btn.r-ex{border-color:var(--success)}.r-btn.r-ex.sel,.r-btn.r-ex:active{background:var(--success);color:#fff}
+    .r-btn.r-ok{border-color:var(--warn)}.r-btn.r-ok.sel,.r-btn.r-ok:active{background:var(--warn);color:#fff}
+    .r-btn.r-ng{border-color:var(--danger)}.r-btn.r-ng.sel,.r-btn.r-ng:active{background:var(--danger);color:#fff}
+    .r-emoji{font-size:26px}.r-lbl{font-size:12px;font-weight:700;margin-top:4px}.r-sub{font-size:10px;opacity:.8;margin-top:2px}
+    /* ACTION */
+    .action-area{padding:14px 0}
+    .swipe-hint{text-align:center;font-size:12px;color:var(--text2);padding-bottom:4px}
+    /* FINISH */
+    .finish{text-align:center;padding:48px 0 20px}
+    .finish-icon{font-size:64px;margin-bottom:14px}
+    .finish-title{font-size:24px;font-weight:700;margin-bottom:6px}
+    .finish-sub{font-size:14px;color:var(--text2);margin-bottom:30px}
+    .finish-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:28px}
+    .fin-stat{background:var(--bg2);border-radius:var(--r);border:1px solid var(--border);padding:14px 8px}
+    .fin-val{font-size:22px;font-weight:700}.fin-lbl{font-size:11px;color:var(--text2);margin-top:3px}
+    /* Q&A LIST */
+    .qa-item{background:var(--bg2);border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:11px;transition:opacity .2s}
+    .qa-item.skipped{opacity:.45}
+    .qa-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+    .qa-q{font-size:15px;font-weight:500;line-height:1.5;flex:1}
+    .qa-acts{display:flex;gap:6px;flex-shrink:0}
+    .qa-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+    .qa-btn:active{background:var(--bg)}
+    .qa-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px}
+    /* MODAL */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+    .overlay.open{opacity:1;pointer-events:all}
+    .modal{background:var(--bg2);border-radius:20px 20px 0 0;padding:24px 18px calc(24px + env(safe-area-inset-bottom));width:100%;max-width:640px;max-height:90vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s}
+    .overlay.open .modal{transform:translateY(0)}
+    .modal-title{font-size:18px;font-weight:700;margin-bottom:18px}
+    /* FORM */
+    .f-group{margin-bottom:14px}
+    .f-label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:5px}
+    .f-input,.f-select,.f-ta{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:11px 12px;font-size:15px;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s}
+    .f-input:focus,.f-ta:focus,.f-select:focus{border-color:var(--primary)}
+    .f-ta{resize:vertical;min-height:90px}
+    .f-tip{font-size:12px;color:var(--text2);margin-top:5px;line-height:1.5;background:var(--bg);padding:8px 10px;border-radius:8px;border-left:3px solid var(--primary)}
+    .f-row{display:flex;gap:8px}
+    .f-row>*{flex:1}
+    /* SKIP TOGGLE */
+    .skip-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border);margin-top:4px}
+    .skip-info .skip-title{font-size:15px;font-weight:500}
+    .skip-info .skip-desc{font-size:12px;color:var(--text2);margin-top:2px}
+    .toggle{position:relative;width:48px;height:28px;flex-shrink:0}
+    .toggle input{opacity:0;width:0;height:0}
+    .tslider{position:absolute;inset:0;background:var(--border);border-radius:28px;cursor:pointer;transition:.25s}
+    .tslider:before{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;left:4px;top:4px;transition:.25s;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+    .toggle input:checked+.tslider{background:var(--warn)}
+    .toggle input:checked+.tslider:before{transform:translateX(20px)}
+    .dark-toggle input:checked+.tslider{background:var(--primary)!important}
+    /* SEARCH */
+    .search{width:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:15px;color:var(--text);font-family:inherit;outline:none;margin-bottom:14px}
+    .search:focus{border-color:var(--primary)}
+    /* TROW */
+    .trow{display:flex;align-items:center;justify-content:space-between;padding:15px 0;border-bottom:1px solid var(--border)}
+    .trow:last-child{border-bottom:none}
+    .tinfo .ttitle{font-size:15px;font-weight:500}
+    .tinfo .tdesc{font-size:13px;color:var(--text2);margin-top:2px}
+    /* EMPTY */
+    .empty{text-align:center;padding:52px 20px;color:var(--text2)}
+    .empty-icon{font-size:48px;margin-bottom:14px}
+    .empty-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
+    /* CAT COLORS */
+    .c0{background:#ede9fe;color:#7c3aed}.c1{background:#dbeafe;color:#1d4ed8}
+    .c2{background:#dcfce7;color:#15803d}.c3{background:#fef9c3;color:#a16207}
+    .c4{background:#fee2e2;color:#b91c1c}.c5{background:#f3e8ff;color:#7e22ce}
+    .c6{background:#e0f2fe;color:#0369a1}.c7{background:#fce7f3;color:#be185d}
+    [data-theme=dark] .c0{background:#4c1d95;color:#c4b5fd}[data-theme=dark] .c1{background:#1e3a5f;color:#93c5fd}
+    [data-theme=dark] .c2{background:#14532d;color:#86efac}[data-theme=dark] .c3{background:#713f12;color:#fde047}
+    [data-theme=dark] .c4{background:#7f1d1d;color:#fca5a5}[data-theme=dark] .c5{background:#581c87;color:#d8b4fe}
+    [data-theme=dark] .c6{background:#0c4a6e;color:#7dd3fc}[data-theme=dark] .c7{background:#831843;color:#fbcfe8}
+    /* CSV */
+    .csv-step{display:none}.csv-step.active{display:block}
+    .map-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)}
+    .map-row:last-child{border-bottom:none}
+    .map-col-name{flex:1;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .map-col-sample{flex:2;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .map-select{flex:0 0 120px;font-size:13px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;outline:none}
+    .map-select:focus{border-color:var(--primary)}
+    .csv-preview-wrap{overflow-x:auto;margin-bottom:16px;border-radius:10px;border:1px solid var(--border)}
+    .csv-preview{width:100%;border-collapse:collapse;font-size:12px}
+    .csv-preview th{background:var(--bg);padding:7px 10px;text-align:left;border-bottom:1.5px solid var(--border);white-space:nowrap;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase}
+    .csv-preview td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .csv-preview tr:last-child td{border-bottom:none}
+    .csv-preview tr:nth-child(even) td{background:var(--bg)}
+    .warn-tag{display:inline-block;background:#fef9c3;color:#a16207;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin:2px 4px 2px 0}
+    .csv-summary{background:var(--bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.9;margin-bottom:14px}
+    /* USER BADGE */
+    .user-badge{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--pri-lt);border-radius:var(--r);margin-bottom:14px}
+    .user-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover}
+    .user-name{font-size:13px;font-weight:600;color:var(--primary)}
+    /* ANIMATION */
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+    .fade-up{animation:fadeUp .3s ease}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  </style>
+</head>
+<body>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div class="login-screen" id="login-screen">
+  <div class="login-logo">💼</div>
+  <div class="login-title">面接練習アプリ</div>
+  <div class="login-sub">どのデバイスからでも<br>いつでも練習できます</div>
+  <button class="login-btn" onclick="signInWithGoogle()">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+    Google でログイン
+  </button>
+</div>
+
+<!-- ===== LOADING SCREEN ===== -->
+<div class="loading-screen hidden" id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-txt" id="loading-txt">読み込み中…</div>
+</div>
+
+<!-- HOME -->
+<div id="page-home" class="page active">
+  <div class="page-title">面接練習</div>
+  <div class="page-sub">今日も頑張りましょう 💪</div>
+  <div id="user-badge-area"></div>
+  <div class="stats-grid" id="stats-grid"></div>
+  <div id="review-alert-area"></div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-top:0">練習モード</div>
+    <div class="opt-grid-3">
+      <div class="opt-card on" id="opt-flash" onclick="setMode('flash')"><div class="opt-icon">🃏</div><div class="opt-lbl">フラッシュ</div></div>
+      <div class="opt-card" id="opt-blank" onclick="setMode('blank')"><div class="opt-icon">📝</div><div class="opt-lbl">穴埋め</div></div>
+      <div class="opt-card" id="opt-chunk" onclick="setMode('chunk')"><div class="opt-icon">🧩</div><div class="opt-lbl">一文ずつ</div></div>
+    </div>
+    <div id="mode-desc" class="f-tip" style="margin-bottom:16px"></div>
+    <div class="sec-lbl">大カテゴリ</div>
+    <div class="chips" id="home-bigcats"></div>
+    <div class="sec-lbl">カテゴリ</div>
+    <div class="chips" id="home-cats"></div>
+    <div class="sec-lbl">出題順</div>
+    <div class="opt-grid">
+      <div class="opt-card on" id="opt-order" onclick="setOpt('order')"><div class="opt-icon">📋</div><div class="opt-lbl">順番通り</div></div>
+      <div class="opt-card" id="opt-shuffle" onclick="setOpt('shuffle')"><div class="opt-icon">🔀</div><div class="opt-lbl">シャッフル</div></div>
+    </div>
+    <div class="sec-lbl">絞り込み</div>
+    <div class="opt-grid">
+      <div class="opt-card" id="opt-weak" onclick="toggleFilter('weak')"><div class="opt-icon">🔁</div><div class="opt-lbl">△のみ復習</div></div>
+      <div class="opt-card" id="opt-new" onclick="toggleFilter('new')"><div class="opt-icon">⭐</div><div class="opt-lbl">未回答のみ</div></div>
+    </div>
+    <button class="btn btn-primary" onclick="startPractice()">▶ 練習を始める</button>
+  </div>
+</div>
+
+<!-- PRACTICE -->
+<div id="page-practice" class="page"></div>
+
+<!-- MANAGE -->
+<div id="page-manage" class="page">
+  <div class="page-title">Q&amp;A 管理</div>
+  <div class="page-sub" id="manage-sub">0件</div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-top:0">大カテゴリ管理</div>
+    <div class="chips" id="bigcat-chips"></div>
+    <div class="f-row" style="margin-top:4px">
+      <input class="f-input" id="new-bigcat-input" placeholder="新しい大カテゴリ名…" onkeydown="if(event.key==='Enter')addBigCat()">
+      <button class="btn btn-secondary btn-sm" onclick="addBigCat()" style="white-space:nowrap;flex:0 0 auto">＋ 追加</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-top:0">カテゴリ管理</div>
+    <div class="chips" id="cat-chips"></div>
+    <div class="f-row" style="margin-top:4px">
+      <input class="f-input" id="new-cat-input" placeholder="新しいカテゴリ名…" onkeydown="if(event.key==='Enter')addCat()">
+      <button class="btn btn-secondary btn-sm" onclick="addCat()" style="white-space:nowrap;flex:0 0 auto">＋ 追加</button>
+    </div>
+  </div>
+  <input class="search" id="search" type="text" placeholder="🔍 質問を検索…" oninput="renderManage()">
+  <div class="sec-lbl" style="margin-top:0">大カテゴリで絞り込み</div>
+  <div class="chips" id="manage-bigcats"></div>
+  <div class="sec-lbl">カテゴリで絞り込み</div>
+  <div class="chips" id="manage-cats"></div>
+  <div id="qa-list"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="page-settings" class="page">
+  <div class="page-title">設定</div>
+  <div class="page-sub">アプリの設定とデータ管理</div>
+  <div class="card" id="account-card"></div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-top:0">テーマ</div>
+    <div class="trow">
+      <div class="tinfo"><div class="ttitle">ダークモード</div><div class="tdesc">目に優しい暗い表示</div></div>
+      <label class="toggle dark-toggle"><input type="checkbox" id="dark-toggle" onchange="applyDark(this.checked)"><span class="tslider"></span></label>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-top:0">Googleスプレッドシートから取り込む</div>
+    <div class="f-tip" style="margin-bottom:12px">📊 スプレッドシートで <strong>ファイル → ダウンロード → CSV</strong> を選んでファイルを保存し、下のボタンで読み込みます。</div>
+    <button class="btn btn-primary" onclick="openCSVImport()">📥 CSVファイルを読み込む</button>
+    <input type="file" id="csv-file" accept=".csv,.tsv,text/csv" style="display:none" onchange="handleCSVFile(event)">
+  </div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-top:0">バックアップ</div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="exportData()">📤 エクスポート</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('imp-file').click()">📥 インポート</button>
+    </div>
+    <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-btn active" id="nb-home" onclick="goPage('home')"><span class="nav-icon">🏠</span><span>ホーム</span></button>
+  <button class="nav-btn" id="nb-manage" onclick="goPage('manage')"><span class="nav-icon">📝</span><span>Q&amp;A</span></button>
+  <button class="nav-btn" id="nb-settings" onclick="goPage('settings')"><span class="nav-icon">⚙️</span><span>設定</span></button>
+</nav>
+<button class="fab hidden" id="fab" onclick="openAdd()">＋</button>
+
+<!-- ADD/EDIT MODAL -->
+<div class="overlay" id="modal-form">
+  <div class="modal">
+    <div class="modal-title" id="form-title">質問を追加</div>
+    <input type="hidden" id="f-id">
+    <div class="f-row">
+      <div class="f-group"><label class="f-label">大カテゴリ</label><select class="f-select" id="f-bigcat"></select></div>
+      <div class="f-group"><label class="f-label">カテゴリ</label><select class="f-select" id="f-cat"></select></div>
+    </div>
+    <div class="f-group"><label class="f-label">No.</label><input class="f-input" id="f-no" placeholder="例: 1, A-01 …" style="max-width:140px"></div>
+    <div class="f-group">
+      <label class="f-label">質問 <span style="color:var(--danger)">*</span></label>
+      <textarea class="f-ta" id="f-q" rows="3" placeholder="例：自己紹介をお願いします"></textarea>
+    </div>
+    <div class="f-group">
+      <label class="f-label">回答例 <span style="color:var(--danger)">*</span></label>
+      <textarea class="f-ta" id="f-a" rows="6" placeholder="回答例を入力…"></textarea>
+      <div class="f-tip">
+        💡 覚えたいキーワードを <strong>【　】</strong> で囲むと穴埋めモードで隠れます。<br>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="autoTag()">✨ キーワードを自動で【　】タグ付け</button>
+      </div>
+    </div>
+    <div class="f-group"><label class="f-label">回答ポイント／メモ</label><textarea class="f-ta" id="f-note" rows="2" placeholder="ポイント・注意点など…"></textarea></div>
+    <div class="skip-row">
+      <div class="skip-info"><div class="skip-title">この質問をスキップ</div><div class="skip-desc">ONにすると練習から除外されます</div></div>
+      <label class="toggle"><input type="checkbox" id="f-skip"><span class="tslider"></span></label>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-form')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveQA()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV IMPORT MODAL -->
+<div class="overlay" id="modal-csv">
+  <div class="modal">
+    <div class="modal-title">CSVインポート</div>
+    <div class="csv-step active" id="csv-step1">
+      <div style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">① 列の対応を確認・設定</div>
+      <div id="csv-map-rows"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0 0;padding:12px;background:var(--bg);border-radius:10px">
+        <input type="checkbox" id="csv-space-to-br" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)">
+        <label for="csv-space-to-br" style="font-size:13px;cursor:pointer;line-height:1.5">
+          <strong>回答・ポイント欄</strong>の半角スペースを改行に変換する
+        </label>
+      </div>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-csv')">キャンセル</button>
+        <button class="btn btn-primary" onclick="goCSVStep2()">次へ → プレビュー確認</button>
+      </div>
+    </div>
+    <div class="csv-step" id="csv-step2">
+      <div style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">② 登録内容のプレビュー確認</div>
+      <div id="csv-preview-area"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goCSVStep1()">← 戻る</button>
+        <button class="btn btn-primary" onclick="confirmCSVImport()">✅ 一括登録する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== FIREBASE =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCmnSX4rmrklWBuHm1a5ADrB64TU1PF8-M",
+  authDomain: "mensetsu-practice.firebaseapp.com",
+  projectId: "mensetsu-practice",
+  storageBucket: "mensetsu-practice.firebasestorage.app",
+  messagingSenderId: "635995049790",
+  appId: "1:635995049790:web:a17d67d6043b19e69b266f"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+let currentUser = null;
+
+// ===== DATA =====
+let D = {
+  questions: [],
+  bigCategories: [],
+  categories: ['志望動機','自己PR','強み・弱み','経歴・スキル','将来のビジョン','その他'],
+  stats: { sessions: 0 }
+};
+
+// ===== PRACTICE STATE =====
+let PS = {
+  queue:[],idx:0,timerSec:0,timerTick:null,
+  ratings:{ex:0,ok:0,ng:0},orderMode:'order',filterMode:'all',
+  bigCatFilter:'all',catFilter:'all',
+  sessionStart:null,practiceMode:'flash',
+  chunkIdx:0,chunkRevealed:false
+};
+let MF = { bigCat:'all', cat:'all' };
+
+const MODE_DESC = {
+  flash:'質問を見て頭の中で答えを考えてから、回答例を確認します。',
+  blank:'回答の【キーワード】が隠れています。タップして1つずつ確認しましょう。',
+  chunk:'回答を1文ずつ表示します。声に出してから次の文へ進む「音読チャンク法」です。',
+};
+
+// ===== SPACED REPETITION =====
+function nextInterval(q,r){
+  const tbl={ex:[7,14,30,60],ok:[3,5,10,21],ng:[1]};
+  const lvl=Math.max(0,Math.min((q.srLevel||0)+(r==='ng'?-1:1),tbl[r].length-1));
+  return{days:tbl[r][lvl],level:lvl};
+}
+function isDueToday(q){return q.nextReview&&q.nextReview<=Date.now();}
+function dueCount(){return D.questions.filter(isDueToday).length;}
+
+// ===== FIRESTORE =====
+async function loadFromFirestore() {
+  if (!currentUser) return;
+  showLoading('データを読み込み中…');
+  try {
+    const snap = await db.collection('users').doc(currentUser.uid).collection('appData').doc('main').get();
+    if (snap.exists) {
+      const data = snap.data();
+      D = Object.assign({questions:[],bigCategories:[],categories:[],stats:{}}, data);
+    } else {
+      // 初回ログイン：localStorageにデータがあれば移行を提案
+      const local = localStorage.getItem('mensetsu-v1');
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          if (parsed.questions && parsed.questions.length > 0) {
+            if (confirm(`このデバイスに${parsed.questions.length}件のデータが見つかりました。\nクラウドに移行しますか？`)) {
+              D = Object.assign({questions:[],bigCategories:[],categories:[],stats:{}}, parsed);
+              await saveToFirestore();
+              localStorage.removeItem('mensetsu-v1');
+            }
+          }
+        } catch(e){}
+      }
+    }
+  } catch(e) {
+    console.error('Load error:', e);
+    alert('データの読み込みに失敗しました。ページを再読み込みしてください。');
+  }
+  hideLoading();
+}
+
+async function saveToFirestore() {
+  if (!currentUser) return;
+  try {
+    await db.collection('users').doc(currentUser.uid).collection('appData').doc('main').set(JSON.parse(JSON.stringify(D)));
+  } catch(e) {
+    console.error('Save error:', e);
+  }
+}
+
+// save はバックグラウンドで実行（UIをブロックしない）
+function save() { saveToFirestore(); }
+
+// ===== AUTH =====
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err => {
+    alert('ログインに失敗しました。もう一度お試しください。\n' + err.message);
+  });
+}
+
+function signOutUser() {
+  if (!confirm('ログアウトしますか？')) return;
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById('login-screen').classList.add('hidden');
+    await loadFromFirestore();
+    renderHome();
+    renderSettings();
+    const dark = localStorage.getItem('mensetsu-dark') === '1';
+    if (dark) { document.documentElement.setAttribute('data-theme','dark'); document.getElementById('dark-toggle').checked = true; }
+  } else {
+    currentUser = null;
+    document.getElementById('login-screen').classList.remove('hidden');
+    hideLoading();
+  }
+});
+
+function showLoading(msg='') {
+  document.getElementById('loading-txt').textContent = msg;
+  document.getElementById('loading-screen').classList.remove('hidden');
+}
+function hideLoading() {
+  document.getElementById('loading-screen').classList.add('hidden');
+}
+
+// ===== NAVIGATION =====
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('nb-'+name)?.classList.add('active');
+  document.getElementById('fab').classList.toggle('hidden', name!=='manage');
+  if (name==='home') renderHome();
+  if (name==='manage') renderManage();
+  if (name==='settings') renderSettings();
+}
+
+// ===== SETTINGS RENDER =====
+function renderSettings() {
+  if (!currentUser) return;
+  const card = document.getElementById('account-card');
+  card.innerHTML = `
+    <div class="sec-lbl" style="margin-top:0">アカウント</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <img src="${currentUser.photoURL||''}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">
+      <div>
+        <div style="font-size:15px;font-weight:600">${esc(currentUser.displayName||'')}</div>
+        <div style="font-size:13px;color:var(--text2)">${esc(currentUser.email||'')}</div>
+      </div>
+    </div>
+    <button class="btn btn-secondary btn-sm" style="width:100%" onclick="signOutUser()">🚪 ログアウト</button>
+  `;
+}
+
+// ===== HOME =====
+function renderHome() {
+  const qs = D.questions;
+  const rated = qs.filter(q=>q.rating).length;
+  const due = dueCount();
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat"><div class="stat-val">${qs.length}</div><div class="stat-lbl">総問題数</div></div>
+    <div class="stat"><div class="stat-val">${D.stats.sessions||0}</div><div class="stat-lbl">練習回数</div></div>
+    <div class="stat"><div class="stat-val">${qs.length?Math.round(rated/qs.length*100):0}%</div><div class="stat-lbl">回答済み</div></div>
+  `;
+  const aa = document.getElementById('review-alert-area');
+  aa.innerHTML = due>0 ? `<div class="review-alert" onclick="startReviewSession()">
+    <div><div class="review-alert-txt">📅 今日のおさらい</div><div class="review-alert-sub">間隔反復スケジュール：復習タイミングの問題があります</div></div>
+    <div class="review-badge">${due}問</div>
+  </div>` : '';
+  updateModeDesc();
+  buildFilterChips('home-bigcats', D.bigCategories, PS.bigCatFilter, 'setBigCatHome');
+  buildFilterChips('home-cats', filteredCats(PS.bigCatFilter), PS.catFilter, 'setCatHome');
+}
+function updateModeDesc() {
+  const el = document.getElementById('mode-desc');
+  if (el) el.textContent = MODE_DESC[PS.practiceMode]||'';
+}
+function buildFilterChips(id, items, sel, fn) {
+  const el = document.getElementById(id); if (!el) return;
+  el.innerHTML = ['all',...items].map(c=>
+    `<div class="chip${c===sel?' active':''}" onclick="${fn}('${esc(c)}')">${c==='all'?'すべて':esc(c)}</div>`
+  ).join('');
+}
+function buildMgmtChips(id, items, delFn) {
+  const el = document.getElementById(id); if (!el) return;
+  el.innerHTML = items.map(c=>
+    `<div class="chip" style="display:inline-flex;align-items:center;gap:5px;padding-right:8px">
+      <span>${esc(c)}</span>
+      <span onclick="${delFn}('${esc(c)}')" style="cursor:pointer;font-size:14px;line-height:1;color:var(--text2);padding:0 2px" title="削除">×</span>
+    </div>`
+  ).join('');
+}
+function filteredCats(bigCatSel) {
+  if (bigCatSel==='all') return D.categories;
+  const cats = [...new Set(D.questions.filter(q=>q.bigCat===bigCatSel).map(q=>q.cat).filter(Boolean))];
+  return D.categories.filter(c=>cats.includes(c));
+}
+function setBigCatHome(bc){PS.bigCatFilter=bc;PS.catFilter='all';buildFilterChips('home-bigcats',D.bigCategories,bc,'setBigCatHome');buildFilterChips('home-cats',filteredCats(bc),'all','setCatHome');}
+function setCatHome(cat){PS.catFilter=cat;buildFilterChips('home-cats',filteredCats(PS.bigCatFilter),cat,'setCatHome');}
+function setBigCatManage(bc){MF.bigCat=bc;MF.cat='all';renderManage();}
+function setCatManage(cat){MF.cat=cat;renderManage();}
+function setMode(m){PS.practiceMode=m;['flash','blank','chunk'].forEach(x=>document.getElementById('opt-'+x)?.classList.toggle('on',x===m));updateModeDesc();}
+function setOpt(m){PS.orderMode=m;document.getElementById('opt-order').classList.toggle('on',m==='order');document.getElementById('opt-shuffle').classList.toggle('on',m==='shuffle');}
+function toggleFilter(mode){
+  const el=document.getElementById('opt-'+mode);const was=el.classList.contains('on');
+  ['weak','new'].forEach(x=>document.getElementById('opt-'+x).classList.remove('on'));
+  PS.filterMode=!was?mode:'all';if(!was)el.classList.add('on');
+}
+
+// ===== PRACTICE =====
+function startReviewSession(){PS.filterMode='review';startPractice();}
+function startPractice(){
+  let q=D.questions.filter(x=>!x.skipped);
+  if(PS.bigCatFilter!=='all')q=q.filter(x=>x.bigCat===PS.bigCatFilter);
+  if(PS.catFilter!=='all')q=q.filter(x=>x.cat===PS.catFilter);
+  if(PS.filterMode==='weak')q=q.filter(x=>x.rating==='ng');
+  else if(PS.filterMode==='new')q=q.filter(x=>!x.rating);
+  else if(PS.filterMode==='review')q=q.filter(isDueToday);
+  if(!q.length){alert('練習する問題がありません。\nQ&A管理から質問を追加するか、スキップを解除してください。');return;}
+  if(PS.orderMode==='shuffle')q=q.sort(()=>Math.random()-.5);
+  PS.queue=q;PS.idx=0;PS.ratings={ex:0,ok:0,ng:0};PS.sessionStart=Date.now();
+  goPage('practice');document.getElementById('nb-home').classList.remove('active');renderCard();
+}
+function renderCard(){
+  const{queue,idx,practiceMode}=PS;
+  if(idx>=queue.length){renderFinish();return;}
+  clearTick();PS.chunkIdx=0;PS.chunkRevealed=false;
+  if(practiceMode==='blank')renderCardBlank();
+  else if(practiceMode==='chunk')renderCardChunk();
+  else renderCardFlash();
+}
+function renderCardFlash(){
+  const q=PS.queue[PS.idx];
+  document.getElementById('page-practice').innerHTML=`
+    <div class="prac-wrap fade-up">
+      ${progHTML()}${modeTabsHTML()}
+      <div class="flashcard" id="fc">
+        ${badgesHTML(q)}
+        <div class="q-text">${esc(q.q)}</div>
+        <div class="timer-row"><span style="font-size:20px">⏱</span><div class="timer-val" id="tv">0:00</div></div>
+        <div id="ans-area" style="display:none">
+          <div class="divider"></div>
+          <div class="ans-label">回答例</div>
+          <div class="ans-text">${esc(q.a)}</div>
+          ${q.note?`<div class="note-box">📌 ${esc(q.note)}</div>`:''}
+          ${ratingHTML()}
+        </div>
+      </div>
+      <div class="action-area">
+        <button class="btn btn-primary" id="reveal-btn" onclick="reveal()">💡 回答を見る</button>
+        ${navHTML()}
+      </div>
+      <div class="swipe-hint">← スワイプで前後移動</div>
+    </div>`;
+  startTick();setupSwipe();
+}
+function reveal(){clearTick();document.getElementById('ans-area').style.display='block';document.getElementById('reveal-btn').style.display='none';}
+function renderCardBlank(){
+  const q=PS.queue[PS.idx];
+  const hasBlank=/【[^】]+】/.test(q.a);
+  const ansHtml=hasBlank?q.a.replace(/【([^】]+)】/g,(_,w)=>`<span class="blank-word" onclick="revealBlank(this)">${esc(w)}</span>`):esc(q.a);
+  document.getElementById('page-practice').innerHTML=`
+    <div class="prac-wrap fade-up">
+      ${progHTML()}${modeTabsHTML()}
+      <div class="flashcard" id="fc">
+        ${badgesHTML(q)}
+        <div class="q-text">${esc(q.q)}</div>
+        <div class="divider"></div>
+        <div class="ans-label">回答例 — タップして確認</div>
+        <div class="ans-text">${ansHtml}</div>
+        ${!hasBlank?`<div class="blank-hint">※ 回答に【キーワード】がありません。</div>`:''}
+        ${q.note?`<div class="note-box">📌 ${esc(q.note)}</div>`:''}
+        <div id="rating-area" style="display:${hasBlank?'none':'block'}">${ratingHTML()}</div>
+      </div>
+      <div class="action-area">
+        ${hasBlank?`<button class="btn btn-primary" id="all-reveal-btn" onclick="revealAllBlanks()">👁 すべて表示</button>`:''}
+        ${navHTML()}
+      </div>
+      <div class="swipe-hint">← スワイプで前後移動</div>
+    </div>`;
+  setupSwipe();
+}
+function revealBlank(el){
+  el.classList.add('revealed');
+  if([...document.querySelectorAll('.blank-word')].every(b=>b.classList.contains('revealed'))){
+    document.getElementById('rating-area').style.display='block';
+    document.getElementById('all-reveal-btn')?.remove();
+  }
+}
+function revealAllBlanks(){document.querySelectorAll('.blank-word').forEach(b=>b.classList.add('revealed'));document.getElementById('rating-area').style.display='block';document.getElementById('all-reveal-btn')?.remove();}
+function renderCardChunk(){
+  const q=PS.queue[PS.idx];const chunks=splitChunks(q.a);
+  const dots=chunks.map((_,i)=>`<div class="chunk-dot${i<PS.chunkIdx?' done':i===PS.chunkIdx?' current':''}" id="dot-${i}"></div>`).join('');
+  const chunkItems=chunks.map((c,i)=>{
+    if(i<PS.chunkIdx)return`<div class="chunk-text" style="opacity:.45;font-size:13px">${esc(c)}</div>`;
+    if(i===PS.chunkIdx)return`<div class="chunk-text chunk-hidden${PS.chunkRevealed?' shown':''}" id="cur-chunk" onclick="revealChunk()">${esc(c)}</div>`;
+    return'';
+  }).join('');
+  const isLast=PS.chunkIdx>=chunks.length-1;
+  const btnLabel=PS.chunkRevealed?(isLast?'✅ 評価する':'次の文へ →'):'👁 この文を見る';
+  document.getElementById('page-practice').innerHTML=`
+    <div class="prac-wrap fade-up">
+      ${progHTML()}${modeTabsHTML()}
+      <div class="flashcard" id="fc">
+        ${badgesHTML(q)}
+        <div class="q-text" style="font-size:15px;margin-bottom:12px">${esc(q.q)}</div>
+        <div class="divider"></div>
+        <div class="ans-label">回答を1文ずつ声に出して確認</div>
+        <div class="chunk-progress" id="chunk-dots">${dots}</div>
+        <div id="chunk-area">${chunkItems}</div>
+        ${q.note?`<div class="note-box">📌 ${esc(q.note)}</div>`:''}
+        <div id="rating-area" style="display:none">${ratingHTML()}</div>
+      </div>
+      <div class="action-area">
+        <button class="btn btn-primary" id="chunk-btn" onclick="chunkAction(${chunks.length})">${btnLabel}</button>
+        ${navHTML()}
+      </div>
+      <div class="swipe-hint">← スワイプで前後移動</div>
+    </div>`;
+  setupSwipe();
+}
+function revealChunk(){if(PS.chunkRevealed)return;document.getElementById('cur-chunk')?.classList.add('shown');PS.chunkRevealed=true;const isLast=PS.chunkIdx>=splitChunks(PS.queue[PS.idx].a).length-1;const btn=document.getElementById('chunk-btn');if(btn)btn.textContent=isLast?'✅ 評価する':'次の文へ →';}
+function chunkAction(total){if(!PS.chunkRevealed){revealChunk();return;}PS.chunkIdx++;if(PS.chunkIdx>=total){document.getElementById('chunk-area').innerHTML='';document.getElementById('chunk-btn').style.display='none';document.getElementById('chunk-dots').innerHTML='';document.getElementById('rating-area').style.display='block';}else{PS.chunkRevealed=false;renderCardChunk();}}
+function splitChunks(t){return(t||'').split(/(?<=[。！？\n])/).map(s=>s.trim()).filter(Boolean)||[t];}
+function progHTML(){return`<div class="prog-row"><div class="prog-bar"><div class="prog-fill" style="width:${Math.round(PS.idx/PS.queue.length*100)}%"></div></div><div class="prog-txt">${PS.idx+1} / ${PS.queue.length}</div></div>`;}
+function modeTabsHTML(){return`<div class="mode-tabs">${[{id:'flash',i:'🃏',l:'フラッシュ'},{id:'blank',i:'📝',l:'穴埋め'},{id:'chunk',i:'🧩',l:'一文ずつ'}].map(m=>`<button class="mode-tab${PS.practiceMode===m.id?' active':''}" onclick="switchMode('${m.id}')"><span class="mode-tab-icon">${m.i}</span>${m.l}</button>`).join('')}</div>`;}
+function badgesHTML(q){const ci=(D.categories.indexOf(q.cat)+8)%8;return`<div class="q-badges">${q.bigCat?`<span class="q-badge" style="background:var(--bg);color:var(--text2)">${esc(q.bigCat)}</span>`:''} ${q.cat?`<span class="q-badge c${ci}">${esc(q.cat)}</span>`:''} ${q.no?`<span class="q-no">No.${esc(q.no)}</span>`:''}</div>`;}
+function navHTML(){return`<div style="display:flex;gap:10px;margin-top:10px"><button class="btn btn-secondary" style="flex:1;font-size:13px" onclick="prevCard()">← 前へ</button><button class="btn btn-secondary" style="flex:1;font-size:13px" onclick="nextCard()">次へ →</button></div>`;}
+function ratingHTML(){return`<div class="sec-lbl" style="margin-top:18px">自己評価</div><div class="rating-grid"><div class="r-btn r-ex" onclick="rate('ex',this)"><div class="r-emoji">◎</div><div class="r-lbl">完璧</div><div class="r-sub">次回 7日後</div></div><div class="r-btn r-ok" onclick="rate('ok',this)"><div class="r-emoji">○</div><div class="r-lbl">まあまあ</div><div class="r-sub">次回 3日後</div></div><div class="r-btn r-ng" onclick="rate('ng',this)"><div class="r-emoji">△</div><div class="r-lbl">要復習</div><div class="r-sub">次回 明日</div></div></div>`;}
+function switchMode(m){PS.practiceMode=m;setMode(m);renderCard();}
+function rate(r,el){
+  clearTick();const q=PS.queue[PS.idx];const i=D.questions.findIndex(x=>x.id===q.id);
+  if(i>=0){const{days,level}=nextInterval(D.questions[i],r);Object.assign(D.questions[i],{rating:r,cnt:(D.questions[i].cnt||0)+1,last:Date.now(),srLevel:level,nextReview:Date.now()+days*86400000});}
+  PS.ratings[r]++;save();
+  document.querySelectorAll('.r-btn').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');
+  setTimeout(nextCard,420);
+}
+function nextCard(){PS.idx++;renderCard();}
+function prevCard(){if(PS.idx>0){PS.idx--;renderCard();}}
+function renderFinish(){
+  const{ratings,queue,sessionStart}=PS;const sec=Math.round((Date.now()-sessionStart)/1000);
+  D.stats.sessions=(D.stats.sessions||0)+1;save();
+  document.getElementById('page-practice').innerHTML=`
+    <div class="finish fade-up">
+      <div class="finish-icon">🎉</div>
+      <div class="finish-title">お疲れ様でした！</div>
+      <div class="finish-sub">${queue.length}問完了 · ${Math.floor(sec/60)}分${sec%60}秒</div>
+      <div class="finish-stats">
+        <div class="fin-stat"><div class="fin-val" style="color:var(--success)">◎ ${ratings.ex}</div><div class="fin-lbl">完璧</div></div>
+        <div class="fin-stat"><div class="fin-val" style="color:var(--warn)">○ ${ratings.ok}</div><div class="fin-lbl">まあまあ</div></div>
+        <div class="fin-stat"><div class="fin-val" style="color:var(--danger)">△ ${ratings.ng}</div><div class="fin-lbl">要復習</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="startPractice()" style="margin-bottom:10px">🔄 もう一度練習</button>
+      <button class="btn btn-secondary" style="width:100%" onclick="goPage('home')">🏠 ホームへ</button>
+    </div>`;
+}
+function startTick(){PS.timerSec=0;updateTV();PS.timerTick=setInterval(()=>{PS.timerSec++;updateTV();},1000);}
+function clearTick(){if(PS.timerTick){clearInterval(PS.timerTick);PS.timerTick=null;}}
+function updateTV(){const el=document.getElementById('tv');if(!el)return;const s=PS.timerSec;el.textContent=`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;el.className='timer-val'+(s>=120?' red':s>=60?' warn':'');}
+function setupSwipe(){const fc=document.getElementById('fc');if(!fc)return;let sx=0;fc.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});fc.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>55){dx<0?nextCard():prevCard();}},{passive:true});}
+
+// ===== CATEGORY =====
+function addBigCat(){const inp=document.getElementById('new-bigcat-input');const name=inp.value.trim();if(!name){inp.focus();return;}if(D.bigCategories.includes(name)){alert('同じ大カテゴリが存在します');return;}D.bigCategories.push(name);inp.value='';save();renderManage();renderHome();}
+function deleteBigCat(name){const inUse=D.questions.some(q=>q.bigCat===name);if(inUse&&!confirm(`「${name}」を使用している質問があります。削除しますか？`))return;if(!inUse&&!confirm(`「${name}」を削除しますか？`))return;D.bigCategories=D.bigCategories.filter(c=>c!==name);D.questions.forEach(q=>{if(q.bigCat===name)q.bigCat='';});if(MF.bigCat===name)MF.bigCat='all';if(PS.bigCatFilter===name)PS.bigCatFilter='all';save();renderManage();renderHome();}
+function addCat(){const inp=document.getElementById('new-cat-input');const name=inp.value.trim();if(!name){inp.focus();return;}if(D.categories.includes(name)){alert('同じカテゴリが存在します');return;}D.categories.push(name);inp.value='';save();renderManage();renderHome();}
+function deleteCat(name){const inUse=D.questions.some(q=>q.cat===name);if(inUse&&!confirm(`「${name}」を使用している質問があります。削除しますか？`))return;if(!inUse&&!confirm(`「${name}」を削除しますか？`))return;D.categories=D.categories.filter(c=>c!==name);D.questions.forEach(q=>{if(q.cat===name)q.cat='';});if(MF.cat===name)MF.cat='all';if(PS.catFilter===name)PS.catFilter='all';save();renderManage();renderHome();}
+
+// ===== MANAGE =====
+function renderManage(){
+  const kw=(document.getElementById('search')?.value||'').toLowerCase();
+  let qs=D.questions.filter(q=>{
+    const mKw=!kw||q.q.toLowerCase().includes(kw)||(q.a||'').toLowerCase().includes(kw)||(q.bigCat||'').toLowerCase().includes(kw);
+    const mBig=MF.bigCat==='all'||q.bigCat===MF.bigCat;
+    const mCat=MF.cat==='all'||q.cat===MF.cat;
+    return mKw&&mBig&&mCat;
+  });
+  document.getElementById('manage-sub').textContent=`${D.questions.length}件（スキップ:${D.questions.filter(q=>q.skipped).length}件）`;
+  buildMgmtChips('bigcat-chips',D.bigCategories,'deleteBigCat');
+  buildMgmtChips('cat-chips',D.categories,'deleteCat');
+  buildFilterChips('manage-bigcats',D.bigCategories,MF.bigCat,'setBigCatManage');
+  buildFilterChips('manage-cats',filteredCats(MF.bigCat),MF.cat,'setCatManage');
+  const rl={ex:'◎ 完璧',ok:'○ まあまあ',ng:'△ 要復習'};
+  const rc={ex:'background:#dcfce7;color:#15803d',ok:'background:#fef9c3;color:#a16207',ng:'background:#fee2e2;color:#b91c1c'};
+  const list=document.getElementById('qa-list');
+  if(!qs.length){list.innerHTML=`<div class="empty"><div class="empty-icon">📝</div><div class="empty-title">${!D.questions.length?'質問がまだありません':'条件に合う質問なし'}</div></div>`;return;}
+  const ci=q=>(D.categories.indexOf(q.cat)+8)%8;
+  list.innerHTML=qs.map(q=>`
+    <div class="qa-item${q.skipped?' skipped':''}">
+      <div class="qa-header">
+        <div class="qa-q">${q.no?`<span style="font-size:11px;color:var(--text2);margin-right:4px">No.${esc(q.no)}</span>`:''}${esc(q.q)}</div>
+        <div class="qa-acts">
+          <button class="qa-btn" title="${q.skipped?'スキップ解除':'スキップ'}" onclick="toggleSkip('${q.id}')">${q.skipped?'▶':'⏭'}</button>
+          <button class="qa-btn" onclick="openEdit('${q.id}')" title="編集">✏️</button>
+          <button class="qa-btn" onclick="delQA('${q.id}')" title="削除">🗑️</button>
+        </div>
+      </div>
+      <div class="qa-meta">
+        ${q.bigCat?`<span class="badge" style="background:var(--bg);color:var(--text2)">${esc(q.bigCat)}</span>`:''}
+        ${q.cat?`<span class="badge c${ci(q)}">${esc(q.cat)}</span>`:''}
+        ${q.rating?`<span class="badge" style="${rc[q.rating]}">${rl[q.rating]}</span>`:''}
+        ${q.skipped?`<span class="badge" style="background:#fef9c3;color:#a16207">スキップ中</span>`:''}
+        ${/【[^】]+】/.test(q.a)?`<span class="badge" style="background:#dcfce7;color:#15803d">穴埋めあり</span>`:''}
+        ${q.cnt?`<span class="badge" style="background:var(--pri-lt);color:var(--primary)">${q.cnt}回練習</span>`:''}
+      </div>
+    </div>`).join('');
+}
+function toggleSkip(id){const i=D.questions.findIndex(x=>x.id===id);if(i<0)return;D.questions[i].skipped=!D.questions[i].skipped;save();renderManage();}
+
+// ===== MODAL =====
+function openAdd(){document.getElementById('form-title').textContent='質問を追加';document.getElementById('f-id').value='';document.getElementById('f-no').value='';document.getElementById('f-q').value='';document.getElementById('f-a').value='';document.getElementById('f-note').value='';document.getElementById('f-skip').checked=false;fillSelects('','');openModal('modal-form');}
+function openEdit(id){const q=D.questions.find(x=>x.id===id);if(!q)return;document.getElementById('form-title').textContent='質問を編集';document.getElementById('f-id').value=id;document.getElementById('f-no').value=q.no||'';document.getElementById('f-q').value=q.q;document.getElementById('f-a').value=q.a||'';document.getElementById('f-note').value=q.note||'';document.getElementById('f-skip').checked=!!q.skipped;fillSelects(q.bigCat||'',q.cat||'');openModal('modal-form');}
+function fillSelects(bigCat,cat){document.getElementById('f-bigcat').innerHTML=`<option value="">（なし）</option>`+D.bigCategories.map(c=>`<option value="${esc(c)}"${c===bigCat?' selected':''}>${esc(c)}</option>`).join('');document.getElementById('f-cat').innerHTML=`<option value="">（なし）</option>`+D.categories.map(c=>`<option value="${esc(c)}"${c===cat?' selected':''}>${esc(c)}</option>`).join('');}
+function saveQA(){
+  const id=document.getElementById('f-id').value;
+  const no=document.getElementById('f-no').value.trim();
+  const q=document.getElementById('f-q').value.trim();
+  const a=document.getElementById('f-a').value.trim();
+  const note=document.getElementById('f-note').value.trim();
+  const bigCat=document.getElementById('f-bigcat').value;
+  const cat=document.getElementById('f-cat').value;
+  const skipped=document.getElementById('f-skip').checked;
+  if(!q){alert('質問を入力してください');return;}
+  if(!a){alert('回答例を入力してください');return;}
+  if(id){const i=D.questions.findIndex(x=>x.id===id);if(i>=0)Object.assign(D.questions[i],{no,q,a,note,bigCat,cat,skipped});}
+  else{D.questions.push({id:'q'+Date.now()+Math.random().toString(36).slice(2,6),no,q,a,note,bigCat,cat,skipped,rating:null,cnt:0,last:null,created:Date.now(),srLevel:0,nextReview:null});}
+  save();closeModal('modal-form');renderManage();renderHome();
+}
+function delQA(id){if(!confirm('この質問を削除しますか？'))return;D.questions=D.questions.filter(x=>x.id!==id);save();renderManage();renderHome();}
+function openModal(id){document.getElementById(id).classList.add('open');document.body.style.overflow='hidden';}
+function closeModal(id){document.getElementById(id).classList.remove('open');document.body.style.overflow='';}
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeModal(o.id);}));
+
+// ===== AUTO TAG =====
+function autoTag(){const ta=document.getElementById('f-a');let text=ta.value;if(!text.trim()){alert('先に回答例を入力してください');return;}if(/【[^】]+】/.test(text)){if(!confirm('すでに【】タグがあります。再度自動タグ付けしますか？'))return;text=text.replace(/【([^】]+)】/g,'$1');}const tagged=text.replace(/([^\s、。！？「」『』（）\n]{2,8})/g,match=>{if(/^[ぁ-ん]{1,3}$/.test(match))return match;if(Math.random()<0.35)return`【${match}】`;return match;}).replace(/【【([^】]+)】】/g,'【$1】');ta.value=tagged;ta.focus();}
+
+// ===== CSV IMPORT =====
+let csvState={rows:[],headers:[]};
+const CSV_FIELDS=[{value:'skip',label:'── スキップ ──'},{value:'bigCat',label:'大カテゴリ'},{value:'cat',label:'カテゴリ'},{value:'no',label:'No.'},{value:'q',label:'面接質問'},{value:'a',label:'回答'},{value:'note',label:'回答ポイント／メモ'}];
+const CSV_DETECT={bigCat:['大カテゴリ','大分類','major'],cat:['カテゴリ','category','cat','分類'],no:['no','no.','番号','number','#'],q:['質問','question','q','面接質問','設問'],a:['回答','answer','ans','a','模範回答','回答例'],note:['ポイント','point','memo','メモ','note','備考','回答ポイント']};
+function openCSVImport(){document.getElementById('csv-file').click();}
+function handleCSVFile(e){
+  const file=e.target.files[0];e.target.value='';if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const buf=ev.target.result;const u8=new Uint8Array(buf);
+    let text;
+    if(u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF){text=new TextDecoder('utf-8').decode(buf);}
+    else{const tryUtf8=new TextDecoder('utf-8').decode(buf);text=tryUtf8.includes('?')?new TextDecoder('shift-jis').decode(buf):tryUtf8;}
+    const rows=parseCSV(text);
+    if(rows.length<2){alert('データが見つかりません。');return;}
+    csvState.headers=rows[0];csvState.rows=rows.slice(1).filter(r=>r.some(c=>c.trim()));
+    renderCSVStep1();openModal('modal-csv');
+  };
+  reader.readAsArrayBuffer(file);
+}
+function parseCSV(text){if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);const rows=[];let row=[],cell='',inQ=false;for(let i=0;i<text.length;i++){const c=text[i],nx=text[i+1];if(inQ){if(c==='"'&&nx==='"'){cell+='"';i++;}else if(c==='"')inQ=false;else cell+=c;}else{if(c==='"')inQ=true;else if(c===','||c==='\t'){row.push(cell);cell='';}else if(c==='\n'||(c==='\r'&&nx==='\n')){row.push(cell);rows.push(row);row=[];cell='';if(c==='\r')i++;}else if(c==='\r'){row.push(cell);rows.push(row);row=[];cell='';}else cell+=c;}}if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.length>0);}
+function detectField(h){const lh=h.toLowerCase().trim();for(const[f,kws]of Object.entries(CSV_DETECT)){if(kws.some(k=>lh.includes(k.toLowerCase())))return f;}return'skip';}
+function renderCSVStep1(){document.getElementById('csv-step1').classList.add('active');document.getElementById('csv-step2').classList.remove('active');const sample=csvState.rows[0]||[];document.getElementById('csv-map-rows').innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${csvState.rows.length}行のデータを検出。各列の対応を確認・修正してください。</div>`+csvState.headers.map((h,i)=>{const det=detectField(h);const sm=(sample[i]||'').slice(0,40);const opts=CSV_FIELDS.map(f=>`<option value="${f.value}"${f.value===det?' selected':''}>${f.label}</option>`).join('');return`<div class="map-row"><div class="map-col-name" title="${esc(h)}">${esc(h)||'（無題）'}</div><div class="map-col-sample">${esc(sm)||'–'}</div><select class="map-select" id="map-sel-${i}">${opts}</select></div>`;}).join('');}
+function goCSVStep1(){document.getElementById('csv-step1').classList.add('active');document.getElementById('csv-step2').classList.remove('active');}
+function goCSVStep2(){const mapping=getMapping();if(!Object.values(mapping).includes('q')){alert('「面接質問」に対応する列を1つ選んでください。');return;}const items=buildImportData(mapping);renderCSVStep2(items,mapping);document.getElementById('csv-step1').classList.remove('active');document.getElementById('csv-step2').classList.add('active');}
+function getMapping(){const m={};csvState.headers.forEach((_,i)=>{m[i]=document.getElementById('map-sel-'+i)?.value||'skip';});return m;}
+function buildImportData(mapping){const spaceToBr=document.getElementById('csv-space-to-br')?.checked;return csvState.rows.map((row,ri)=>{const item={bigCat:'',cat:'',no:'',q:'',a:'',note:'',_row:ri+2};Object.entries(mapping).forEach(([ci,f])=>{if(f==='skip')return;let v=(row[ci]||'').trim();if(spaceToBr&&(f==='a'||f==='note'))v=v.replace(/ /g,'\n');item[f]=v;});return item;}).filter(it=>it.q);}
+function renderCSVStep2(items,mapping){
+  const has=f=>Object.values(mapping).includes(f);
+  const noA=items.filter(it=>!it.a).length;const dupQ=items.filter(it=>D.questions.some(q=>q.q===it.q)).length;const skipped=csvState.rows.length-items.length;
+  const newBigCats=[...new Set(items.map(it=>it.bigCat).filter(c=>c&&!D.bigCategories.includes(c)))];
+  const newCats=[...new Set(items.map(it=>it.cat).filter(c=>c&&!D.categories.includes(c)))];
+  let warns='';if(noA>0)warns+=`<span class="warn-tag">⚠ 回答が空: ${noA}件</span>`;if(dupQ>0)warns+=`<span class="warn-tag">⚠ 既存と重複: ${dupQ}件</span>`;if(skipped>0)warns+=`<span class="warn-tag">ℹ スキップ: ${skipped}行</span>`;
+  const cols=[has('bigCat')&&'bigCat',has('cat')&&'cat',has('no')&&'no','q',has('a')&&'a',has('note')&&'note'].filter(Boolean);
+  const labels={bigCat:'大カテゴリ',cat:'カテゴリ',no:'No.',q:'質問',a:'回答',note:'ポイント'};
+  const slice=v=>(v||'').slice(0,28)+((v||'').length>28?'…':'');
+  const trs=items.slice(0,8).map(it=>`<tr>${cols.map(c=>`<td>${esc(slice(it[c]))}</td>`).join('')}</tr>`).join('');
+  document.getElementById('csv-preview-area').innerHTML=`<div class="csv-summary">登録予定：<strong>${items.length}件</strong>${newBigCats.length?`<br>新規大カテゴリ：<strong>${newBigCats.map(c=>`「${esc(c)}」`).join('')}</strong>`:''} ${newCats.length?`<br>新規カテゴリ：<strong>${newCats.map(c=>`「${esc(c)}」`).join('')}</strong>`:''}</div>${warns?`<div style="margin-bottom:12px">${warns}</div>`:''}<div class="csv-preview-wrap"><table class="csv-preview"><thead><tr>${cols.map(c=>`<th>${labels[c]}</th>`).join('')}</tr></thead><tbody>${trs}</tbody></table></div>${items.length>8?`<div style="font-size:12px;color:var(--text2);margin-bottom:12px">… 他 ${items.length-8}件</div>`:''}`;
+  csvState._importData=items;csvState._newBigCats=newBigCats;csvState._newCats=newCats;
+}
+function confirmCSVImport(){
+  const{_importData:items,_newBigCats:newBigCats=[],_newCats:newCats=[]}=csvState;if(!items?.length)return;
+  newBigCats.forEach(c=>{if(!D.bigCategories.includes(c))D.bigCategories.push(c);});
+  newCats.forEach(c=>{if(!D.categories.includes(c))D.categories.push(c);});
+  items.forEach(it=>{D.questions.push({id:'q'+Date.now()+Math.random().toString(36).slice(2,6),no:it.no,q:it.q,a:it.a,note:it.note,bigCat:it.bigCat,cat:it.cat,skipped:false,rating:null,cnt:0,last:null,created:Date.now(),srLevel:0,nextReview:null});});
+  save();closeModal('modal-csv');goPage('manage');alert(`✅ ${items.length}件を登録しました！`);
+}
+
+// ===== BACKUP =====
+function applyDark(on){document.documentElement.setAttribute('data-theme',on?'dark':'');localStorage.setItem('mensetsu-dark',on?'1':'0');}
+function exportData(){const blob=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mensetsu-'+new Date().toISOString().split('T')[0]+'.json';a.click();}
+function importData(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.questions)throw 0;if(confirm(`${d.questions.length}件をインポートします。現在のデータは上書きされます。`)){D=Object.assign({questions:[],bigCategories:[],categories:[],stats:{}},d);save();renderManage();renderHome();alert('インポート完了！');}}catch(err){alert('インポート失敗。');}};
+  r.readAsText(file);
+}
+
+// ===== UTILS =====
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
